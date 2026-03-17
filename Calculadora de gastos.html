@@ -1,0 +1,182 @@
+#calculadoradegastos
+ 
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dividir Gastos 💸</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gradient-to-br from-rose-100 via-sky-100 to-emerald-100 min-h-screen text-gray-800">
+
+<div class="max-w-md mx-auto p-4">
+
+<h1 class="text-2xl font-bold text-center mb-4">💸 Gastos entre amigxs</h1>
+
+<!-- PERSONAS -->
+<div class="bg-white rounded-xl shadow p-4 mb-4">
+<h2 class="font-semibold mb-2">👥 Participantes</h2>
+
+<div class="flex gap-2">
+<input id="nombre" placeholder="Nombre"
+class="border p-2 rounded-lg flex-1">
+<button onclick="agregarPersona()"
+class="bg-blue-300 px-3 rounded-lg">➕</button>
+</div>
+
+<ul id="listaPersonas" class="mt-2 text-sm"></ul>
+</div>
+
+<!-- GASTOS -->
+<div class="bg-white rounded-xl shadow p-4 mb-4">
+<h2 class="font-semibold mb-2">🧾 Gastos</h2>
+
+<select id="personaGasto" class="border p-2 rounded-lg w-full mb-2"></select>
+
+<input id="monto" type="number" placeholder="Monto"
+class="border p-2 rounded-lg w-full mb-2">
+
+<input id="descripcion" placeholder="Descripción"
+class="border p-2 rounded-lg w-full mb-2">
+
+<button onclick="agregarGasto()"
+class="bg-green-300 w-full py-2 rounded-lg mb-2">
+Agregar gasto ➕
+</button>
+
+<ul id="listaGastos" class="text-sm"></ul>
+</div>
+
+<!-- RESULTADOS -->
+<div class="bg-white rounded-xl shadow p-4">
+<button onclick="calcular()"
+class="bg-purple-300 w-full py-2 rounded-lg mb-2">
+Calcular 💰
+</button>
+
+<button onclick="exportarWhatsApp()"
+class="bg-emerald-300 w-full py-2 rounded-lg mb-2">
+Enviar por WhatsApp 📤
+</button>
+
+<div id="resultado" class="text-sm"></div>
+</div>
+
+</div>
+
+<script>
+let personas = [];
+let gastos = [];
+let ultimoResumen = "";
+
+function agregarPersona() {
+  const nombre = document.getElementById("nombre").value.trim();
+  if (!nombre) return alert("Ingresá un nombre");
+  if (personas.length >= 15) return alert("Máximo 15 personas");
+
+  personas.push({ nombre, balance: 0 });
+  document.getElementById("nombre").value = "";
+  render();
+}
+
+function agregarGasto() {
+  const idx = document.getElementById("personaGasto").value;
+  const monto = parseFloat(document.getElementById("monto").value);
+  const desc = document.getElementById("descripcion").value;
+
+  if (idx === "" || !monto) return alert("Completá los datos");
+
+  gastos.push({ persona: parseInt(idx), monto, desc });
+
+  document.getElementById("monto").value = "";
+  document.getElementById("descripcion").value = "";
+  render();
+}
+
+function eliminarGasto(i) {
+  gastos.splice(i, 1);
+  render();
+}
+
+function render() {
+  // Personas
+  document.getElementById("listaPersonas").innerHTML =
+    personas.map(p => `<li>• ${p.nombre}</li>`).join("");
+
+  // Select
+  document.getElementById("personaGasto").innerHTML =
+    personas.map((p, i) => `<option value="${i}">${p.nombre}</option>`).join("");
+
+  // Gastos con eliminar
+  document.getElementById("listaGastos").innerHTML =
+    gastos.map((g, i) => `
+      <li class="flex justify-between items-center border-b py-1">
+        <span>💳 ${personas[g.persona].nombre}: $${g.monto} (${g.desc})</span>
+        <button onclick="eliminarGasto(${i})" class="text-red-500">❌</button>
+      </li>
+    `).join("");
+}
+
+function calcular() {
+  if (personas.length === 0) return;
+
+  personas.forEach(p => p.balance = 0);
+
+  let total = 0;
+
+  gastos.forEach(g => {
+    personas[g.persona].balance += g.monto;
+    total += g.monto;
+  });
+
+  const promedio = total / personas.length;
+
+  personas.forEach(p => p.balance -= promedio);
+
+  let deudores = personas.filter(p => p.balance < 0);
+  let acreedores = personas.filter(p => p.balance > 0);
+
+  let texto = `💸 *Resumen de gastos*\n\n`;
+  texto += `Total: $${total.toFixed(2)}\n`;
+  texto += `Por persona: $${promedio.toFixed(2)}\n\n`;
+
+  let html = `<p><b>Total:</b> $${total.toFixed(2)}</p>`;
+  html += `<p><b>Por persona:</b> $${promedio.toFixed(2)}</p><ul>`;
+
+  while (deudores.length && acreedores.length) {
+    let d = deudores[0];
+    let a = acreedores[0];
+    let monto = Math.min(-d.balance, a.balance);
+
+    texto += `👉 ${d.nombre} le paga $${monto.toFixed(2)} a ${a.nombre}\n`;
+    html += `<li>💸 ${d.nombre} → $${monto.toFixed(2)} → ${a.nombre}</li>`;
+
+    d.balance += monto;
+    a.balance -= monto;
+
+    if (Math.abs(d.balance) < 0.01) deudores.shift();
+    if (Math.abs(a.balance) < 0.01) acreedores.shift();
+  }
+
+  html += "</ul>";
+
+  ultimoResumen = texto;
+  document.getElementById("resultado").innerHTML = html;
+}
+
+function exportarWhatsApp() {
+  if (!ultimoResumen) {
+    alert("Primero calculá los gastos");
+    return;
+  }
+
+  const url = "https://wa.me/?text=" + encodeURIComponent(ultimoResumen);
+  window.open(url, "_blank");
+}
+</script>
+
+</body>
+</html>
