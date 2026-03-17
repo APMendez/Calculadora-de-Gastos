@@ -20,8 +20,7 @@
 <div class="flex gap-2">
 <input id="nombre" placeholder="Nombre"
 class="border p-2 rounded-lg flex-1">
-<button onclick="agregarPersona()"
-class="bg-blue-300 px-3 rounded-lg">➕</button>
+<button onclick="agregarPersona()" class="bg-blue-300 px-3 rounded-lg">➕</button>
 </div>
 
 <ul id="listaPersonas" class="mt-2 text-sm"></ul>
@@ -39,6 +38,8 @@ class="border p-2 rounded-lg w-full mb-2">
 <input id="descripcion" placeholder="Descripción"
 class="border p-2 rounded-lg w-full mb-2">
 
+<div id="checkboxPersonas" class="mb-2 text-sm"></div>
+
 <button onclick="agregarGasto()"
 class="bg-green-300 w-full py-2 rounded-lg mb-2">
 Agregar gasto ➕
@@ -54,12 +55,16 @@ class="bg-purple-300 w-full py-2 rounded-lg mb-2">
 Calcular 💰
 </button>
 
-<button onclick="exportarWhatsApp()"
-class="bg-emerald-300 w-full py-2 rounded-lg mb-2">
-Enviar por WhatsApp 📤
+<textarea id="salidaTexto"
+class="w-full h-40 border rounded-lg p-2 text-sm mb-2"
+placeholder="Acá aparece el resumen para copiar..."></textarea>
+
+<button onclick="copiarTexto()"
+class="bg-emerald-300 w-full py-2 rounded-lg">
+Copiar 📋
 </button>
 
-<div id="resultado" class="text-sm"></div>
+<div id="resultado" class="text-sm mt-3"></div>
 </div>
 
 </div>
@@ -67,7 +72,6 @@ Enviar por WhatsApp 📤
 <script>
 let personas = [];
 let gastos = [];
-let ultimoResumen = "";
 
 function agregarPersona() {
   const nombre = document.getElementById("nombre").value.trim();
@@ -84,9 +88,18 @@ function agregarGasto() {
   const monto = parseFloat(document.getElementById("monto").value);
   const desc = document.getElementById("descripcion").value;
 
-  if (idx === "" || !monto) return alert("Completá los datos");
+  const checks = document.querySelectorAll(".checkPersona:checked");
+  const participantes = Array.from(checks).map(c => parseInt(c.value));
 
-  gastos.push({ persona: parseInt(idx), monto, desc });
+  if (idx === "" || !monto || participantes.length === 0)
+    return alert("Completá todo y elegí participantes");
+
+  gastos.push({
+    persona: parseInt(idx),
+    monto,
+    desc,
+    participantes
+  });
 
   document.getElementById("monto").value = "";
   document.getElementById("descripcion").value = "";
@@ -99,20 +112,26 @@ function eliminarGasto(i) {
 }
 
 function render() {
-  // Personas
   document.getElementById("listaPersonas").innerHTML =
     personas.map(p => `<li>• ${p.nombre}</li>`).join("");
 
-  // Select
   document.getElementById("personaGasto").innerHTML =
     personas.map((p, i) => `<option value="${i}">${p.nombre}</option>`).join("");
 
-  // Gastos con eliminar
+  // checkboxes
+  document.getElementById("checkboxPersonas").innerHTML =
+    personas.map((p, i) => `
+      <label class="block">
+        <input type="checkbox" class="checkPersona" value="${i}" checked>
+        ${p.nombre}
+      </label>
+    `).join("");
+
   document.getElementById("listaGastos").innerHTML =
     gastos.map((g, i) => `
-      <li class="flex justify-between items-center border-b py-1">
+      <li class="border-b py-1 flex justify-between">
         <span>💳 ${personas[g.persona].nombre}: $${g.monto} (${g.desc})</span>
-        <button onclick="eliminarGasto(${i})" class="text-red-500">❌</button>
+        <button onclick="eliminarGasto(${i})">❌</button>
       </li>
     `).join("");
 }
@@ -122,34 +141,31 @@ function calcular() {
 
   personas.forEach(p => p.balance = 0);
 
-  let total = 0;
-
   gastos.forEach(g => {
+    const parte = g.monto / g.participantes.length;
+
+    g.participantes.forEach(i => {
+      personas[i].balance -= parte;
+    });
+
     personas[g.persona].balance += g.monto;
-    total += g.monto;
   });
-
-  const promedio = total / personas.length;
-
-  personas.forEach(p => p.balance -= promedio);
 
   let deudores = personas.filter(p => p.balance < 0);
   let acreedores = personas.filter(p => p.balance > 0);
 
-  let texto = `💸 *Resumen de gastos*\n\n`;
-  texto += `Total: $${total.toFixed(2)}\n`;
-  texto += `Por persona: $${promedio.toFixed(2)}\n\n`;
+  let texto = "💸 RESUMEN DE GASTOS\n\n";
 
-  let html = `<p><b>Total:</b> $${total.toFixed(2)}</p>`;
-  html += `<p><b>Por persona:</b> $${promedio.toFixed(2)}</p><ul>`;
+  let html = "<ul>";
 
   while (deudores.length && acreedores.length) {
     let d = deudores[0];
     let a = acreedores[0];
+
     let monto = Math.min(-d.balance, a.balance);
 
-    texto += `👉 ${d.nombre} le paga $${monto.toFixed(2)} a ${a.nombre}\n`;
-    html += `<li>💸 ${d.nombre} → $${monto.toFixed(2)} → ${a.nombre}</li>`;
+    texto += `${d.nombre} le paga $${monto.toFixed(2)} a ${a.nombre}\n`;
+    html += `<li>${d.nombre} → $${monto.toFixed(2)} → ${a.nombre}</li>`;
 
     d.balance += monto;
     a.balance -= monto;
@@ -160,18 +176,15 @@ function calcular() {
 
   html += "</ul>";
 
-  ultimoResumen = texto;
   document.getElementById("resultado").innerHTML = html;
+  document.getElementById("salidaTexto").value = texto;
 }
 
-function exportarWhatsApp() {
-  if (!ultimoResumen) {
-    alert("Primero calculá los gastos");
-    return;
-  }
-
-  const url = "https://wa.me/?text=" + encodeURIComponent(ultimoResumen);
-  window.open(url, "_blank");
+function copiarTexto() {
+  const texto = document.getElementById("salidaTexto");
+  texto.select();
+  document.execCommand("copy");
+  alert("Copiado al portapapeles");
 }
 </script>
 
