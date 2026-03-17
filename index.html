@@ -11,15 +11,17 @@
 
 <div class="max-w-md mx-auto p-4">
 
-<h1 class="text-2xl font-bold text-center mb-4">💸 Gastos entre amigxs</h1>
+<!-- TITULO EDITABLE -->
+<input id="titulo"
+class="w-full text-xl font-bold text-center mb-4 bg-white rounded-lg p-2 shadow"
+placeholder="Nombre de la reunión (ej: Asado viernes 🔥)">
 
 <!-- PERSONAS -->
 <div class="bg-white rounded-xl shadow p-4 mb-4">
 <h2 class="font-semibold mb-2">👥 Participantes</h2>
 
 <div class="flex gap-2">
-<input id="nombre" placeholder="Nombre"
-class="border p-2 rounded-lg flex-1">
+<input id="nombre" placeholder="Nombre" class="border p-2 rounded-lg flex-1">
 <button onclick="agregarPersona()" class="bg-blue-300 px-3 rounded-lg">➕</button>
 </div>
 
@@ -38,11 +40,16 @@ class="border p-2 rounded-lg w-full mb-2">
 <input id="descripcion" placeholder="Descripción"
 class="border p-2 rounded-lg w-full mb-2">
 
+<div class="flex gap-2 mb-2">
+<button onclick="seleccionarTodos()" class="bg-gray-200 px-2 rounded">Todos</button>
+<button onclick="seleccionarNinguno()" class="bg-gray-200 px-2 rounded">Ninguno</button>
+</div>
+
 <div id="checkboxPersonas" class="mb-2 text-sm"></div>
 
-<button onclick="agregarGasto()"
+<button onclick="guardarGasto()"
 class="bg-green-300 w-full py-2 rounded-lg mb-2">
-Agregar gasto ➕
+Guardar gasto ➕
 </button>
 
 <ul id="listaGastos" class="text-sm"></ul>
@@ -57,7 +64,7 @@ Calcular 💰
 
 <textarea id="salidaTexto"
 class="w-full h-40 border rounded-lg p-2 text-sm mb-2"
-placeholder="Acá aparece el resumen para copiar..."></textarea>
+placeholder="Resumen para copiar..."></textarea>
 
 <button onclick="copiarTexto()"
 class="bg-emerald-300 w-full py-2 rounded-lg">
@@ -70,45 +77,99 @@ Copiar 📋
 </div>
 
 <script>
-let personas = [];
-let gastos = [];
+let titulo = localStorage.getItem("titulo") || "";
+let personas = JSON.parse(localStorage.getItem("personas")) || [];
+let gastos = JSON.parse(localStorage.getItem("gastos")) || [];
+let editando = null;
+
+function guardarStorage() {
+  localStorage.setItem("titulo", titulo);
+  localStorage.setItem("personas", JSON.stringify(personas));
+  localStorage.setItem("gastos", JSON.stringify(gastos));
+}
+
+// Titulo editable
+document.getElementById("titulo").value = titulo;
+document.getElementById("titulo").addEventListener("input", (e) => {
+  titulo = e.target.value;
+  guardarStorage();
+});
 
 function agregarPersona() {
   const nombre = document.getElementById("nombre").value.trim();
-  if (!nombre) return alert("Ingresá un nombre");
-  if (personas.length >= 15) return alert("Máximo 15 personas");
+  if (!nombre) return;
+  if (personas.length >= 15) return alert("Máximo 15");
 
   personas.push({ nombre, balance: 0 });
   document.getElementById("nombre").value = "";
+  guardarStorage();
   render();
 }
 
-function agregarGasto() {
+function guardarGasto() {
   const idx = document.getElementById("personaGasto").value;
   const monto = parseFloat(document.getElementById("monto").value);
   const desc = document.getElementById("descripcion").value;
 
-  const checks = document.querySelectorAll(".checkPersona:checked");
-  const participantes = Array.from(checks).map(c => parseInt(c.value));
+  const participantes = Array.from(
+    document.querySelectorAll(".checkPersona:checked")
+  ).map(c => parseInt(c.value));
 
-  if (idx === "" || !monto || participantes.length === 0)
-    return alert("Completá todo y elegí participantes");
+  if (!monto || participantes.length === 0) return alert("Datos incompletos");
 
-  gastos.push({
-    persona: parseInt(idx),
-    monto,
-    desc,
-    participantes
-  });
+  const gasto = { persona: parseInt(idx), monto, desc, participantes };
 
-  document.getElementById("monto").value = "";
-  document.getElementById("descripcion").value = "";
+  if (editando !== null) {
+    gastos[editando] = gasto;
+    editando = null;
+  } else {
+    gastos.push(gasto);
+  }
+
+  limpiarFormulario();
+  guardarStorage();
   render();
+}
+
+function editarGasto(i) {
+  const g = gastos[i];
+  editando = i;
+
+  document.getElementById("personaGasto").value = g.persona;
+  document.getElementById("monto").value = g.monto;
+  document.getElementById("descripcion").value = g.desc;
+
+  renderCheckboxes(g.participantes);
 }
 
 function eliminarGasto(i) {
   gastos.splice(i, 1);
+  guardarStorage();
   render();
+}
+
+function limpiarFormulario() {
+  document.getElementById("monto").value = "";
+  document.getElementById("descripcion").value = "";
+}
+
+function seleccionarTodos() {
+  document.querySelectorAll(".checkPersona").forEach(c => c.checked = true);
+}
+
+function seleccionarNinguno() {
+  document.querySelectorAll(".checkPersona").forEach(c => c.checked = false);
+}
+
+function renderCheckboxes(seleccion = null) {
+  document.getElementById("checkboxPersonas").innerHTML =
+    personas.map((p, i) => `
+      <label class="block">
+        <input type="checkbox" class="checkPersona" value="${i}"
+        ${!seleccion || seleccion.includes(i) ? "checked" : ""}>
+        ${p.nombre}
+      </label>
+    `).join("");
 }
 
 function render() {
@@ -118,27 +179,21 @@ function render() {
   document.getElementById("personaGasto").innerHTML =
     personas.map((p, i) => `<option value="${i}">${p.nombre}</option>`).join("");
 
-  // checkboxes
-  document.getElementById("checkboxPersonas").innerHTML =
-    personas.map((p, i) => `
-      <label class="block">
-        <input type="checkbox" class="checkPersona" value="${i}" checked>
-        ${p.nombre}
-      </label>
-    `).join("");
+  renderCheckboxes();
 
   document.getElementById("listaGastos").innerHTML =
     gastos.map((g, i) => `
       <li class="border-b py-1 flex justify-between">
         <span>💳 ${personas[g.persona].nombre}: $${g.monto} (${g.desc})</span>
-        <button onclick="eliminarGasto(${i})">❌</button>
+        <div>
+          <button onclick="editarGasto(${i})">✏️</button>
+          <button onclick="eliminarGasto(${i})">❌</button>
+        </div>
       </li>
     `).join("");
 }
 
 function calcular() {
-  if (personas.length === 0) return;
-
   personas.forEach(p => p.balance = 0);
 
   gastos.forEach(g => {
@@ -154,17 +209,15 @@ function calcular() {
   let deudores = personas.filter(p => p.balance < 0);
   let acreedores = personas.filter(p => p.balance > 0);
 
-  let texto = "💸 RESUMEN DE GASTOS\n\n";
-
-  let html = "<ul>";
+  let texto = `💸 ${titulo || "Resumen de gastos"}\n\n`;
+  let html = `<p class="font-bold">${titulo || "Resumen de gastos"}</p><ul>`;
 
   while (deudores.length && acreedores.length) {
     let d = deudores[0];
     let a = acreedores[0];
-
     let monto = Math.min(-d.balance, a.balance);
 
-    texto += `${d.nombre} le paga $${monto.toFixed(2)} a ${a.nombre}\n`;
+    texto += `${d.nombre} paga $${monto.toFixed(2)} a ${a.nombre}\n`;
     html += `<li>${d.nombre} → $${monto.toFixed(2)} → ${a.nombre}</li>`;
 
     d.balance += monto;
@@ -181,11 +234,13 @@ function calcular() {
 }
 
 function copiarTexto() {
-  const texto = document.getElementById("salidaTexto");
-  texto.select();
+  const t = document.getElementById("salidaTexto");
+  t.select();
   document.execCommand("copy");
-  alert("Copiado al portapapeles");
+  alert("Copiado");
 }
+
+render();
 </script>
 
 </body>
