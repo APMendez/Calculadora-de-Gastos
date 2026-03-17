@@ -15,6 +15,10 @@
 <input id="titulo"
 class="w-full text-xl font-bold text-center mb-4 bg-white rounded-lg p-2 shadow"
 placeholder="Nombre de la reunión (ej: Asado viernes 🔥)">
+<button onclick="resetearTodo()"
+class="w-full mb-4 bg-red-300 py-2 rounded-lg">
+Resetear reunión 🗑️
+</button>
 
 <!-- PERSONAS -->
 <div class="bg-white rounded-xl shadow p-4 mb-4">
@@ -238,6 +242,28 @@ function copiarTexto() {
   t.select();
   document.execCommand("copy");
   alert("Copiado");
+}
+  function resetearTodo() {
+  const confirmar = confirm("¿Seguro querés borrar toda la reunión?");
+  if (!confirmar) return;
+
+  // Reset variables
+  titulo = "";
+  personas = [];
+  gastos = [];
+  editando = null;
+
+  // Limpiar storage
+  localStorage.removeItem("titulo");
+  localStorage.removeItem("personas");
+  localStorage.removeItem("gastos");
+
+  // Limpiar UI
+  document.getElementById("titulo").value = "";
+  document.getElementById("salidaTexto").value = "";
+  document.getElementById("resultado").innerHTML = "";
+
+
 }
 
 render();
